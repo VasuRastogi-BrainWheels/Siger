@@ -1,5 +1,6 @@
 
 import {Vector3} from "./Vector.js"
+
 function readFile(path){
   
   return new Promise(resolve=>{
@@ -176,7 +177,7 @@ function OBJparser(text,material) {
       },
       g:function(name){
         parseGroupDimension(currentGroup.dimension)//parse the dimension of the previous group before creating a new group
-        currentGroup.center=new Vector3([(currentGroup.dimension.min.x+currentGroup.dimension.max.x)/2,(currentGroup.dimension.min.y+currentGroup.dimension.max.y)/2,(currentGroup.dimension.min.z+currentGroup.dimension.max.z)/2])
+        currentGroup.dimension.center=new Vector3([(currentGroup.dimension.min.x+currentGroup.dimension.max.x)/2,(currentGroup.dimension.min.y+currentGroup.dimension.max.y)/2,(currentGroup.dimension.min.z+currentGroup.dimension.max.z)/2])
         name=name.join("_").trim().replace(".","_")//get the name of group
         Output.groups[name]=getNewGroup()
         currentGroup=Output.groups[name]//set the current group to the newly created group
@@ -256,14 +257,16 @@ function OBJparser(text,material) {
 
     }
     parseGroupDimension(currentGroup.dimension)//parse the dimension of the last group after finishing parsing the file
-    currentGroup.center=new Vector3([(currentGroup.dimension.min.x+currentGroup.dimension.max.x)/2,(currentGroup.dimension.min.y+currentGroup.dimension.max.y)/2,(currentGroup.dimension.min.z+currentGroup.dimension.max.z)/2])
+    currentGroup.dimension.center=new Vector3([(currentGroup.dimension.min.x+currentGroup.dimension.max.x)/2,(currentGroup.dimension.min.y+currentGroup.dimension.max.y)/2,(currentGroup.dimension.min.z+currentGroup.dimension.max.z)/2])
     dimension.LHB=new Vector3([dimension.maxX-dimension.minX,dimension.maxY-dimension.minY,dimension.maxZ-dimension.minZ])
     Output.dimension={
       size:dimension.LHB,
+      center:new Vector3([(dimension.minX+dimension.maxX)/2,(dimension.minY+dimension.maxY)/2,(dimension.minZ+dimension.maxZ)/2]),
       min:new Vector3([dimension.minX,dimension.minY,dimension.minZ]),
-      max:new Vector3([dimension.maxX,dimension.maxY,dimension.maxZ])
+      max:new Vector3([dimension.maxX,dimension.maxY,dimension.maxZ]),
+
     }
-   
+    
     return Output//parsedObj.parse()
 
     
@@ -313,7 +316,7 @@ async function MTLparser(text,path) {
     colorPallete: [],
     
     rawData:[],//data in form of array which can be modified
-    gpuData:new Float32Array(15*20),//max 15 materials*5 vec4(*4) for each material(diffuse,ambient, specular ,emissive & texDimension)
+    gpuData:new Float32Array(20*24),//max 15 materials*5 vec4(*4) for each material(diffuse,ambient, specular ,emissive & texDimension)
     
   };
   
@@ -397,7 +400,7 @@ illum 2
 // if file not found fill data with default material
   if (data=="Code:404")  data=defaultMaterial
   else data=defaultMaterial+"\n" + data// else add default material at rtop of dat
-  console.log(data)
+ // console.log(data)
   return await  MTLparser(data,path)
   
 }

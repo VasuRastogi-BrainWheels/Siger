@@ -292,18 +292,17 @@ class ShaderDataManager {
                        buffer:null,
                       a:0,
                        fillFor(model){
-                        this.a++
+                        
                              //if (this.a<6)console.log(model.Mesh)
                              this.buffer.bufferData=model.Mesh.materials.gpuData 
                              SigerGlobalManager.gl.bindBuffer(SigerGlobalManager.gl.UNIFORM_BUFFER,this.buffer.buffer)
-                             SigerGlobalManager.gl.bufferSubData(SigerGlobalManager.gl.UNIFORM_BUFFER,64,new Uint32Array([1,0,596,335]))
-                             SigerGlobalManager.gl.bufferSubData(SigerGlobalManager.gl.UNIFORM_BUFFER,36*4,new Uint32Array([1,0,596,335]))
+                         
                        },
                        create(siger_gl){
                            //create the buffer
                                 let ubo2 = siger_gl.createBuffer();
                             //set size    
-                                const UBO_SIZE_BYTES = 15 * 20 * 4;//max 10 materials *(5vec*4 float per vector )*4 byte per fliat
+                                const UBO_SIZE_BYTES = 20 * 24 * 4;//max 20 materials *(5vec*4 float per vector )*4 byte per fliat
                              //bind buffer at a specific address   
                                 siger_gl.bindBufferBase(siger_gl.UNIFORM_BUFFER, 1, ubo2);
                                 siger_gl.bufferData(siger_gl.UNIFORM_BUFFER, UBO_SIZE_BYTES, siger_gl.STATIC_DRAW);
@@ -482,6 +481,7 @@ export class SigerWorld{
         this.render=renderWorld
         this.renderings=new SigerWorldRenderings(this,this.shader,this.engine)
         this.effects=new SigerWorldEffects(this.gl,this.shader)
+        SigerGlobalManager.worlds.push(this)
     }
     add(entity){
         let ObjectAdders={

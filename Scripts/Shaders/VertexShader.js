@@ -12,7 +12,9 @@ export const vsSource = `#version 300 es
         vec4 ambient;
         vec4 specular;
         vec4 emissive;
+       
         vec4 diffuseMapDimensions;
+        vec4 properties;
     };
 
     // 2. Define the Uniform Buffer Object (UBO) Block
@@ -23,7 +25,7 @@ export const vsSource = `#version 300 es
         ModelData models[MAX_MODELS_Parts];
     };
     layout(std140) uniform MaterialBlock {
-        MaterialData materials[15];
+        MaterialData materials[20];
     };
     // --- Inputs (Attributes/Uniforms) ---
     in vec4 aVertexPosition; // Vertices come in as an 'input'

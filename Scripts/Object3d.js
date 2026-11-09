@@ -40,7 +40,26 @@ function duplicateObject(obj,transformation){
         dimension:{
             size:dimension.size.copy(),
             min:new Vector3([dimension.min.x,dimension.min.y,dimension.min.z]),
-            max:new Vector3([dimension.max.x,dimension.max.y,dimension.max.z])
+            max:new Vector3([dimension.max.x,dimension.max.y,dimension.max.z]),
+            center:dimension.center.copy(),
+            update(){
+                const min=this.dimension.min.copy()
+                const max=this.dimension.max.copy()
+                let vertices=new Matrix([
+                    [min.x,min.y,min.z,1],
+                    [max.x,max.y,max.z,1],
+                ])
+                let transformation = Scale(this.scale);       
+                transformation = transformation.multiply(rotate_y(this.rotation.y));
+                transformation = transformation.multiply(Translate(this.position));
+               
+                vertices = vertices.multiply(transformation);
+
+                return{
+                    min:new Vector3([vertices.data[0][0],vertices.data[0][1],vertices.data[0][2]]),
+                    max:new Vector3([vertices.data[1][0],vertices.data[1][1],vertices.data[1][2]]),
+                }
+            }
         }
 
     }}
@@ -75,7 +94,30 @@ export async function Object3D(path ,transformation={}) {
                 startOffset:0,
                 is_static:false,
                 count:0,
-                dimension:Model.dimension,
+                dimension:{
+                    min:Model.dimension.min.copy(),
+                    max:Model.dimension.max.copy(),
+                    size:Model.dimension.size.copy(),
+                    center:Model.dimension.center,
+                    update(){
+                        const min=this.dimension.min
+                        const max=this.dimension.max
+                        let vertices=new Matrix([
+                            [min.x,min.y,min.z,1],
+                            [max.x,max.y,max.z,1],
+                        ])
+                        let transformation = Scale(this.scale);       
+                        transformation = transformation.multiply(rotate_y(this.rotation.y));
+                        transformation = transformation.multiply(Translate(this.position));
+                        //vertices=vertices.multiply(Translate(this.dimension.center))
+                        vertices = vertices.multiply(transformation);
+
+                        return{
+       min:new Vector3([vertices.data[0][0],vertices.data[0][1],vertices.data[0][2]]),
+                    max:new Vector3([vertices.data[1][0],vertices.data[1][1],vertices.data[1][2]]),
+                        }
+                    }
+                },
                 transformationType:"dyn",//static:model dont rotate or scale(like trees buildings) dyn:model can rotate
                 transposeMatrix:{//gpu matricies
 
@@ -131,12 +173,16 @@ export async function Object3D(path ,transformation={}) {
 
             Object.keys(Model.Materials.map).forEach((m,i)=>{
                 m=Model.Materials.map[m]
-                data.Mesh.materials.gpuData.set( [m.diffuse[0],m.diffuse[1],m.diffuse[2],1], i*20+0);
-                data.Mesh.materials.gpuData.set( [m.ambient[0],m.ambient[1],m.ambient[2],1], i*20+4);
-                data.Mesh.materials.gpuData.set( [m.specular[0],m.specular[1],m.specular[2],1], i*20+8);
-                data.Mesh.materials.gpuData.set( [m.emissive[0],m.emissive[1],m.emissive[2],1], i*20+12);
+                data.Mesh.materials.gpuData.set( [m.diffuse[0],m.diffuse[1],m.diffuse[2],1], i*24+0);
+                data.Mesh.materials.gpuData.set( [m.ambient[0],m.ambient[1],m.ambient[2],1], i*24+4);
+                data.Mesh.materials.gpuData.set( [m.specular[0],m.specular[1],m.specular[2],1], i*24+8);
+                data.Mesh.materials.gpuData.set( [m.emissive[0],m.emissive[1],m.emissive[2],1], i*24+12);
+                
                 m.diffuse.textureDimension=SigerGlobalManager.shaderDataManager.textureUnit.diffuseTexture.addTexture(m.textures.diffuse)
-                data.Mesh.materials.gpuData.set(SigerGlobalManager.shaderDataManager.textureUnit.diffuseTexture.addTexture(m.textures.diffuse), i*20+16);});
+                data.Mesh.materials.gpuData.set(SigerGlobalManager.shaderDataManager.textureUnit.diffuseTexture.addTexture(m.textures.diffuse), i*24+16);
+
+                data.Mesh.materials.gpuData.set( [m.shininess,m.opacity,m.hasTexture,1], i*24+20);});
+                
 
     return data
 }
@@ -156,7 +202,7 @@ export function VehicleBody3D(obj3d,physicalProperties={}){
           friction:0.03,//friction coefficient
           steeringAngle:0,// current steering angle of the vehicle
           jolt :0,//amount by which acceleration will change
-          BoundingBox:BoundingBox.bindObject3d(obj3d,new Vector3([0.4,0.2,0.2])),   
+          BoundingBox:BoundingBox.bindObject3d(obj3d,new Vector3([0.0,0.0,0.0])),   
           direction:0,
           maxSpeed:physicalProperties.maxSpeed??6,
           power:physicalProperties.power??0.05,
@@ -325,25 +371,32 @@ export function VehicleBody3D(obj3d,physicalProperties={}){
 export class BoundingBox{
     constructor(obj,padding=new Vector3([0,0,0])){
         let scale=obj.scale
-        let dim=new Vector3([(obj.dimension.size.x*scale.x)/2-padding.x,(obj.dimension.size.y*scale.y)/2-padding.y,(obj.dimension.size.z*scale.z)/2-padding.z])
+        let dim=new Vector3([(obj.dimension.size.x*scale.x)-padding.x,(obj.dimension.size.y*scale.y)-padding.y,(obj.dimension.size.z*scale.z)-padding.z])
         this.dimension=dim
         this.position=obj.position.copy()
         this.rotation=obj.rotation.copy()
+        this.scale=obj.scale
+        //this.cube=SigerGlobalManager.worlds[0].renderings.normalModels[0].duplicate()
+        this.center=obj.center?obj.center: obj.dimension.center
+        if(! this.center) this.center=new Vector3([0,0,0])
+           
+        //this.center=new Matrix([[this.center.x,this.center.y,this.center.z,1]])
         this.BindingObject=obj
-        this.min=null
-        this.max=null
+        this.min=obj.dimension.min
+
+        this.max=obj.dimension.max
         this.vertices=new Matrix([
-            [1.0, 1.0, -1.0, 1],
-            [1.0, -1.0, -1.0, 1],
-            [1.0, 1.0, 1.0, 1],//maximum
-            [1.0, -1.0, 1.0, 1],
-            [-1.0, 1.0, -1.0, 1],
-            [-1.0, -1.0, -1.0, 1],//minimum
-            [-1.0, 1.0, 1.0, 1],
-            [-1.0, -1.0, 1.0, 1],
+             [0.5, 0.5, -0.5,1],
+             [0.5, -0.5, -0.5,1],
+             [0.5, 0.5, 0.5,1],//max
+             [0.5, -0.5, 0.5,1],
+             [-0.5, 0.5, -0.5,1],
+             [-0.5, -0.5, -0.5,1],//min
+             [-0.5, 0.5, 0.5,1],
+             [-0.5, -0.5, 0.5,1]
         ])
         this.updateTransformation(obj)
-        //this.setWorldAABB()
+        
 
     }
     static bindObject3d(obj,padding=new Vector3([0,0,0])){  
@@ -357,30 +410,51 @@ export class BoundingBox{
         
         
         
-        let worldPos = object.position.plus(group.center);
+      
 
         let obj = {
             scale: object.scale.copy(),
-            position: worldPos,
+            position: object.position.copy(),
             rotation: object.rotation.copy(),
             dimension: group.dimension,
-            center:group.center
+            center:new Vector3([0,0,0]),
+            isGroup:true
         };
-        
+        obj.dimension.update=function (){
+                const min=this.dimension.min
+                const max=this.dimension.max
+                let vertices=new Matrix([
+                    [min.x,min.y,min.z,1],
+                    [max.x,max.y,max.z,1],
+                ])
+                let transformation = Scale(this.scale);       
+                transformation = transformation.multiply(rotate_y(this.rotation.y));
+                transformation = transformation.multiply(Translate(this.position));
+                vertices=vertices.multiply(Translate(this.center))
+                vertices = vertices.multiply(transformation);
+
+                return{
+                    min:new Vector3([vertices.data[0][0],vertices.data[0][1],vertices.data[0][2]]),
+                    max:new Vector3([vertices.data[1][0],vertices.data[1][1],vertices.data[1][2]]),
+                }
+        }
         return new BoundingBox(obj, padding);
     
     }
-    resetVertices(){
-        this.vertices=new Matrix([
-            [1.0, 1.0, -1.0, 1],
-            [1.0, -1.0, -1.0, 1],
-            [1.0, 1.0, 1.0, 1],
-            [1.0, -1.0, 1.0, 1],
-            [-1.0, 1.0, -1.0, 1],
-            [-1.0, -1.0, -1.0, 1],
-            [-1.0, 1.0, 1.0, 1],
-            [-1.0, -1.0, 1.0, 1],
-        ])
+    setVertices(obj){
+        let min = obj.min;
+        let max = obj.max;
+      
+        this.vertices = new Matrix([
+            [max.x, max.y, min.z, 1],
+            [max.x, min.y, min.z, 1],
+            [max.x, max.y, max.z, 1], // max
+            [max.x, min.y, max.z, 1],
+            [min.x, max.y, min.z, 1],
+            [min.x, min.y, min.z, 1], // min
+            [min.x, max.y, max.z, 1],
+            [min.x, min.y, max.z, 1]
+        ]);
     }
     setWorldAABB() {
         let minX = Infinity, minY = Infinity, minZ = Infinity;
@@ -397,14 +471,10 @@ export class BoundingBox{
         this.max= new Vector3([maxX, maxY, maxZ])
     }
     updateTransformation(obj){
-        this.resetVertices()
-        this.position=obj.position.copy()
-        this.rotation=obj.rotation.copy()
-        let transformation = Scale(this.dimension);
-        transformation = transformation.multiply(rotate_y(this.rotation.y));
-        transformation = transformation.multiply(Translate(this.position));
-        //here
-        this.vertices = this.vertices.multiply(transformation);
+        obj=obj.dimension.update.bind(obj)
+        this.setVertices(obj())
+    //apply transformation to bounding box     
+
         this.setWorldAABB()
     }
     intersects(otherBox) {
@@ -414,8 +484,8 @@ export class BoundingBox{
         // Standard 3D AABB collison check
         return (
             (boxA.min.x+pad <= boxB.max.x && boxA.max.x-pad >= boxB.min.x) &&
-            (boxA.min.y+pad <= boxB.max.y && boxA.max.y-pad >= boxB.min.y) &&
-            boxA.min.z+pad <= boxB.max.z && boxA.max.z-pad >= boxB.min.z
+            //(boxA.min.y+pad <= boxB.max.y && boxA.max.y-pad >= boxB.min.y) &&
+            (boxA.min.z+pad <= boxB.max.z && boxA.max.z-pad >= boxB.min.z)
         );
     }
 
